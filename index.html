@@ -1612,7 +1612,9 @@ function updateScoreSummary() {
   let diff = null;
   if (t && holesPlayed === currentHoles && gross > 0) {
     let rating = t.rating, slope = t.slope;
-    if (currentHoles === 9 && c.holes === 18) rating = rating / 2;
+    // For 9-hole rounds, halve the rating if it's an 18-hole rating
+    // (either the course itself is 18-hole, or the rating was entered as 18-hole equivalent — over 60)
+    if (currentHoles === 9 && (c.holes === 18 || rating > 60)) rating = rating / 2;
     diff = calcDifferential(gross, rating, slope);
   }
 
@@ -1648,7 +1650,9 @@ function saveScore() {
   }
 
   let rating = t.rating, slope = t.slope;
-  if (currentHoles === 9 && c.holes === 18) rating = rating / 2;
+  // For 9-hole rounds, halve the rating if it's an 18-hole rating
+  // (either the course itself is 18-hole, or the rating was entered as 18-hole equivalent — over 60)
+  if (currentHoles === 9 && (c.holes === 18 || rating > 60)) rating = rating / 2;
   const diff = calcDifferential(gross, rating, slope);
 
   const roundData = {
