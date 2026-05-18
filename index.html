@@ -191,6 +191,11 @@
   }
   .score-row:hover { border-color: var(--gold); box-shadow: var(--shadow-md); transform: translateY(-1px); }
   .score-row:active { transform: translateY(0); }
+  .score-row.used {
+    background: var(--green-pale);
+    border-color: var(--green-lt);
+  }
+  .score-row.used:hover { border-color: var(--green-md); }
   .score-course { font-weight: 600; font-size: 14px; color: var(--text); }
   .score-tee { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
   .score-gross {
@@ -1144,22 +1149,23 @@ function calcHandicapIndex(allScores) {
     .slice(0, 20);
 
   // Combine consecutive 9-hole rounds into 18-hole-equivalent differentials.
+  // Track which round IDs feed each combined diff so the UI can highlight them.
   // A single trailing unpaired 9-hole differential is doubled as a rough estimate.
-  const diffs = [];
-  let nineHeld = null;
+  const diffs = [];               // [{ value, ids: [roundId, ...] }, ...]
+  let nineHeld = null;            // { value, id } or null
   for (const r of rounds) {
     if (r.holes === 18) {
-      diffs.push(r.differential);
+      diffs.push({ value: r.differential, ids: [r.id] });
     } else {
       if (nineHeld !== null) {
-        diffs.push(nineHeld + r.differential);
+        diffs.push({ value: nineHeld.value + r.differential, ids: [nineHeld.id, r.id] });
         nineHeld = null;
       } else {
-        nineHeld = r.differential;
+        nineHeld = { value: r.differential, id: r.id };
       }
     }
   }
-  if (nineHeld !== null) diffs.push(nineHeld * 2);
+  if (nineHeld !== null) diffs.push({ value: nineHeld.value * 2, ids: [nineHeld.id] });
 
   const n = diffs.length;
   if (n < 3) return null;
@@ -1179,11 +1185,13 @@ function calcHandicapIndex(allScores) {
   else if (n === 19) { useCount = 7; adjust =  0;   }
   else               { useCount = 8; adjust =  0;   }
 
-  const sorted = [...diffs].sort((a,b) => a - b);
-  const avg = sorted.slice(0, useCount).reduce((s,v) => s+v, 0) / useCount;
+  const sorted = [...diffs].sort((a,b) => a.value - b.value);
+  const picked = sorted.slice(0, useCount);
+  const usedIds = new Set(picked.flatMap(d => d.ids));
+  const avg = picked.reduce((s,d) => s + d.value, 0) / useCount;
   const index = Math.round((avg + adjust) * 10) / 10;
 
-  return { index, sourceCount: n, useCount, adjust, lowestDiff: sorted[0] };
+  return { index, sourceCount: n, useCount, adjust, lowestDiff: sorted[0].value, usedIds };
 }
 
 function stablefordPoints(score, par, hcp, holeIndex) {
@@ -1246,17 +1254,19 @@ function renderDashboard() {
     .sort((a,b) => new Date(b.date) - new Date(a.date))
     .slice(0, 5);
 
+  const usedIds = hi ? hi.usedIds : null;
   document.getElementById('dash-recent').innerHTML = recent.length
-    ? recent.map(r => scoreRowHTML(r, false)).join('')
+    ? recent.map(r => scoreRowHTML(r, false, usedIds)).join('')
     : `<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">No rounds yet — go enter your first score!</div></div>`;
 }
 
-function scoreRowHTML(r, showDel) {
+function scoreRowHTML(r, showDel, usedIds) {
   const c = courses.find(x => x.id === r.courseId);
   const courseName = c ? c.name : 'Unknown course';
   const dateStr = new Date(r.date).toLocaleDateString('nl-NL', {day:'numeric',month:'short',year:'numeric'});
   const teePart = r.teeName ? `${r.teeName} tee · ` : '';
-  return `<div class="score-row" onclick="editScore('${r.id}')" title="Tap to edit">
+  const usedClass = (usedIds && usedIds.has(r.id)) ? ' used' : '';
+  return `<div class="score-row${usedClass}" onclick="editScore('${r.id}')" title="Tap to edit">
     <div>
       <div class="score-course">${courseName}</div>
       <div class="score-tee">${teePart}${dateStr}</div>
@@ -1714,9 +1724,11 @@ function saveScore() {
 
 function renderHistory() {
   const sorted = [...scores].sort((a,b) => new Date(b.date) - new Date(a.date));
+  const hi = calcHandicapIndex(scores);
+  const usedIds = hi ? hi.usedIds : null;
   const el = document.getElementById('history-list');
   el.innerHTML = sorted.length
-    ? sorted.map(r => scoreRowHTML(r, true)).join('')
+    ? sorted.map(r => scoreRowHTML(r, true, usedIds)).join('')
     : `<div class="empty-state">
         <div class="empty-icon">📋</div>
         <div class="empty-text">No rounds recorded yet</div>
