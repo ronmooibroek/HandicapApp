@@ -490,6 +490,21 @@
     box-shadow: 0 0 0 4px rgba(184,148,42,0.15);
   }
   .hole-input.filled { background: #fff; border-color: var(--green-pale); }
+  /* Score-tier shading (gross relative to par), aligned with Dutch Cup palette */
+  .hole-input.score-albatross { background: #111827; color: #ffffff; border-color: #000000; }
+  .hole-input.score-eagle     { background: #34d399; color: #064e3b; border-color: #10b981; }
+  .hole-input.score-birdie    { background: #86efac; color: #065f46; border-color: #4ade80; }
+  .hole-input.score-par       { background: #e5e7eb; color: #1f2937; border-color: #d1d5db; }
+  .hole-input.score-bogey     { background: #fca5a5; color: #7f1d1d; border-color: #f87171; }
+  .hole-input.score-double    { background: #f87171; color: #ffffff; border-color: #ef4444; }
+  .hole-input.score-worse     { background: #6b21a8; color: #ffffff; border-color: #581c87; }
+  .hole-input.score-albatross::placeholder,
+  .hole-input.score-double::placeholder,
+  .hole-input.score-worse::placeholder { color: rgba(255,255,255,0.4); }
+  /* Keep the tier color when focused; show focus via a strong gold halo only */
+  .hole-input[class*="score-"]:focus {
+    box-shadow: 0 0 0 4px rgba(184,148,42,0.35);
+  }
   .hole-stb {
     font-size: 13px;
     margin-top: 6px;
@@ -1610,8 +1625,27 @@ function updateScoreSummary() {
 
   for (let i = 1; i <= currentHoles; i++) {
     const par = allPars[i-1] || 4;
-    const val = parseInt(document.getElementById('hole-' + i)?.value) || 0;
+    const inputEl = document.getElementById('hole-' + i);
+    const val = parseInt(inputEl?.value) || 0;
     const stbEl = document.getElementById('stb-' + i);
+
+    // Tier class based on gross vs par
+    if (inputEl) {
+      inputEl.classList.remove('score-albatross','score-eagle','score-birdie','score-par','score-bogey','score-double','score-worse');
+      if (val > 0) {
+        const diff = val - par;
+        let cls;
+        if      (diff <= -3) cls = 'score-albatross';
+        else if (diff === -2) cls = 'score-eagle';
+        else if (diff === -1) cls = 'score-birdie';
+        else if (diff === 0)  cls = 'score-par';
+        else if (diff === 1)  cls = 'score-bogey';
+        else if (diff === 2)  cls = 'score-double';
+        else                  cls = 'score-worse';
+        inputEl.classList.add(cls);
+      }
+    }
+
     if (val > 0) {
       gross += val;
       parPlayed += par;
